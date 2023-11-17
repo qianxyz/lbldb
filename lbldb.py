@@ -1,26 +1,26 @@
 import csv
-from typing import IO, Callable, Optional
+from typing import Callable, Optional
 
 
 class Database:
-    def __init__(self, stream: IO, fieldnames: list[str]) -> None:
-        self.stream = stream
-        self.fieldnames = fieldnames
-
-    @classmethod
-    def new(cls, path: str, fieldnames: list[str]) -> "Database":
-        stream = open(path, "x", newline="")
-        writer = csv.DictWriter(stream, fieldnames=fieldnames)
-        writer.writeheader()
-        return cls(stream, fieldnames)
-
-    @classmethod
-    def load(cls, path: str) -> "Database":
-        stream = open(path, "r+", newline="")
-        reader = csv.DictReader(stream)
-        fieldnames = reader.fieldnames
-        assert fieldnames is not None, "csv file has no header"
-        return cls(stream, list(fieldnames))
+    def __init__(self, path: str, fieldnames: Optional[list[str]] = None) -> None:
+        if fieldnames is None:
+            # `fieldnames` not provided;
+            # assert `path` exists (`r+` does not allow creation)
+            # and the file has a header
+            self.stream = open(path, "r+", newline="")
+            reader = csv.DictReader(self.stream)
+            _fieldnames = reader.fieldnames
+            assert _fieldnames is not None, "csv file has no header"
+            self.fieldnames = list(_fieldnames)
+        else:
+            # `fieldnames` explicitly provided;
+            # assert `path` does not exist (with mode `x+`)
+            # and write the header to it
+            self.stream = open(path, "x+", newline="")
+            writer = csv.DictWriter(self.stream, fieldnames=fieldnames)
+            writer.writeheader()
+            self.fieldnames = fieldnames
 
     def __iter__(self) -> csv.DictReader:
         self.stream.seek(0)
