@@ -1,5 +1,5 @@
 import csv
-from typing import IO
+from typing import IO, Callable, Optional
 
 
 class Database:
@@ -9,14 +9,14 @@ class Database:
 
     @classmethod
     def new(cls, path: str, fieldnames: list[str]) -> "Database":
-        stream = open(path, 'x', newline="")
+        stream = open(path, "x", newline="")
         writer = csv.DictWriter(stream, fieldnames=fieldnames)
         writer.writeheader()
         return cls(stream, fieldnames)
 
     @classmethod
-    def load(cls, path) -> "Database":
-        stream = open(path, 'r+', newline="")
+    def load(cls, path: str) -> "Database":
+        stream = open(path, "r+", newline="")
         reader = csv.DictReader(stream)
         fieldnames = reader.fieldnames
         assert fieldnames is not None, "csv file has no header"
@@ -26,11 +26,28 @@ class Database:
         self.stream.seek(0)
         return csv.DictReader(self.stream)
 
-    def append(self, record: dict):
+    def append(self, record: dict) -> None:
         self.stream.seek(0, 2)  # to the end
         writer = csv.DictWriter(self.stream, fieldnames=self.fieldnames)
         writer.writerow(record)
 
 
 class Query:
-    pass
+    def __init__(
+        self,
+        db: Database,
+        projections: Optional[list[str]] = None,
+        filters: Optional[list[Callable]] = None,
+    ) -> None:
+        self.db = db
+        self.projections = projections if projections is not None else []
+        self.filters = filters if filters is not None else []
+
+    def add_projection(self, *args: str) -> None:
+        self.projections.extend(args)
+
+    def add_filter(self, *args: Callable) -> None:
+        self.filters.extend(args)
+
+    def execute(self) -> None:
+        raise NotImplementedError("TODO")
