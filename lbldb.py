@@ -1,5 +1,6 @@
 import csv
 import re
+from collections import defaultdict
 from typing import Callable, Optional, Sequence
 
 
@@ -25,33 +26,41 @@ class Column:
         self.dbid = dbid
         self.name = name
 
+    def __call__(self, row: dict) -> str:
+        v = next(iter(row.values()))  # get an arbituary value from row
+        if isinstance(v, str):  # simple query
+            return row[self.name]
+        elif isinstance(v, dict):  # join query
+            return row[self.dbid][self.name]
+        raise TypeError(f"{row} is not a valid database row")
+
     def __eq__(self, other) -> Filter:
         if isinstance(other, Column):
-            return Filter(lambda r: r[self.name] == r[other.name])
-        return Filter(lambda r: type(other)(r[self.name]) == other)
+            return Filter(lambda r: self(r) == other(r))
+        return Filter(lambda r: type(other)(self(r)) == other)
 
     def __ne__(self, other) -> Filter:
         if isinstance(other, Column):
-            return Filter(lambda r: r[self.name] != r[other.name])
-        return Filter(lambda r: type(other)(r[self.name]) != other)
+            return Filter(lambda r: self(r) != other(r))
+        return Filter(lambda r: type(other)(self(r)) != other)
 
     def __lt__(self, other) -> Filter:
-        return Filter(lambda r: type(other)(r[self.name]) < other)
+        return Filter(lambda r: type(other)(self(r)) < other)
 
     def __le__(self, other) -> Filter:
-        return Filter(lambda r: type(other)(r[self.name]) <= other)
+        return Filter(lambda r: type(other)(self(r)) <= other)
 
     def __gt__(self, other) -> Filter:
-        return Filter(lambda r: type(other)(r[self.name]) > other)
+        return Filter(lambda r: type(other)(self(r)) > other)
 
     def __ge__(self, other) -> Filter:
-        return Filter(lambda r: type(other)(r[self.name]) >= other)
+        return Filter(lambda r: type(other)(self(r)) >= other)
 
     def isin(self, seq: Sequence[str]) -> Filter:
-        return Filter(lambda r: r[self.name] in seq)
+        return Filter(lambda r: self(r) in seq)
 
     def matches(self, regex: str) -> Filter:
-        return Filter(lambda r: re.match(regex, r[self.name]) is not None)
+        return Filter(lambda r: re.match(regex, self(r)) is not None)
 
 
 class Database:
@@ -122,7 +131,7 @@ class SimpleQuery(Query):
             if not all(f(row) for f in self.filters):
                 continue
             # apply projection (if any)
-            if len(self.projections) != 0:
+            if self.projections:
                 row = {k.name: row[k.name] for k in self.projections}
             print(row)
 
@@ -146,5 +155,13 @@ class JoinQuery(Query):
 
     def execute(self) -> None:
         for row in self._nlj():
-            # TODO: project and filter
+            # apply filtering
+            if not all(f(row) for f in self.filters):
+                continue
+            # apply projection (if any)
+            if self.projections:
+                r = defaultdict(dict)
+                for p in self.projections:
+                    r[p.dbid][p.name] = row[p.dbid][p.name]
+                row = dict(r)
             print(row)
