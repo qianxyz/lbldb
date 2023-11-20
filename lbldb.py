@@ -117,6 +117,9 @@ class Query:
         self.filters.extend(args)
         return self
 
+    def __iter__(self):
+        raise NotImplementedError
+
     def execute(self):
         raise NotImplementedError
 
@@ -126,7 +129,7 @@ class SimpleQuery(Query):
         super().__init__()
         self.db = db
 
-    def execute(self) -> None:
+    def __iter__(self):
         for row in self.db:
             # apply filtering
             if not all(f(row) for f in self.filters):
@@ -134,6 +137,10 @@ class SimpleQuery(Query):
             # apply projection (if any)
             if self.projections:
                 row = {k.name: row[k.name] for k in self.projections}
+            yield row
+
+    def execute(self) -> None:
+        for row in self:
             print(row)
 
 
@@ -142,7 +149,7 @@ class JoinQuery(Query):
         super().__init__()
         self.db = db
 
-    def _nlj(self):
+    def __iter__(self):
         def product(iterables):
             if not iterables:
                 yield {}
@@ -152,10 +159,7 @@ class JoinQuery(Query):
                 for rest in product(tail):
                     yield {id(head): item, **rest}
 
-        yield from product(self.db)
-
-    def execute(self) -> None:
-        for row in self._nlj():
+        for row in product(self.db):
             # apply filtering
             if not all(f(row) for f in self.filters):
                 continue
@@ -165,4 +169,8 @@ class JoinQuery(Query):
                 for p in self.projections:
                     r[p.dbid][p.name] = row[p.dbid][p.name]
                 row = dict(r)
+            yield row
+
+    def execute(self) -> None:
+        for row in self:
             print(row)
