@@ -135,11 +135,12 @@ class JoinQuery(Query):
     def _nlj(self):
         def product(iterables):
             if not iterables:
-                yield ()
+                yield {}
                 return
-            for item in iterables[0]:
-                for rest in product(iterables[1:]):
-                    yield (item, *rest)
+            head, *tail = iterables
+            for item in head:
+                for rest in product(tail):
+                    yield {id(head): item, **rest}
 
         yield from product(self.db)
 
