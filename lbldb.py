@@ -89,8 +89,13 @@ class Database:
 
 
 class Query:
-    def __init__(self, db: Database) -> None:
-        self.db = db
+    def __new__(cls, *db: Database):
+        if len(db) == 1:
+            return super().__new__(SimpleQuery)
+        else:
+            return super().__new__(JoinQuery)
+
+    def __init__(self) -> None:
         self.projections: list[Column] = []
         self.filters: list[Filter] = []
 
@@ -102,6 +107,15 @@ class Query:
         self.filters.extend(args)
         return self
 
+    def execute(self):
+        raise NotImplementedError
+
+
+class SimpleQuery(Query):
+    def __init__(self, db: Database) -> None:
+        super().__init__()
+        self.db = db
+
     def execute(self) -> None:
         for row in self.db:
             # apply filtering
@@ -110,4 +124,26 @@ class Query:
             # apply projection (if any)
             if len(self.projections) != 0:
                 row = {k.name: row[k.name] for k in self.projections}
+            print(row)
+
+
+class JoinQuery(Query):
+    def __init__(self, *db: Database) -> None:
+        super().__init__()
+        self.db = db
+
+    def _nlj(self):
+        def product(iterables):
+            if not iterables:
+                yield ()
+                return
+            for item in iterables[0]:
+                for rest in product(iterables[1:]):
+                    yield (item, *rest)
+
+        yield from product(self.db)
+
+    def execute(self) -> None:
+        for row in self._nlj():
+            # TODO: project and filter
             print(row)
