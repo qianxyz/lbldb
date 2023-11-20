@@ -101,6 +101,7 @@ class Query:
             for fieldname in db.fieldnames
         ]
         self.filters: list[Filter] = []
+        self._limit: Optional[int] = None
 
     def project(self, *args: Column, **kwargs: Column) -> "Query":
         self.projections = [(arg, arg.name) for arg in args] + [
@@ -110,6 +111,10 @@ class Query:
 
     def filter(self, *args: Filter) -> "Query":
         self.filters.extend(args)
+        return self
+
+    def limit(self, n: int) -> "Query":
+        self._limit = n
         return self
 
     def __iter__(self) -> Iterator[dict[int, dict[str, str]]]:
@@ -122,6 +127,7 @@ class Query:
                 for rest in product(tail):
                     yield {id(head): item, **rest}
 
+        count = 0
         for row in product(self.dbs):
             # apply filtering
             if not all(f(row) for f in self.filters):
@@ -131,6 +137,9 @@ class Query:
             for p, _ in self.projections:
                 r[p.dbid][p.name] = row[p.dbid][p.name]
             yield dict(r)
+            count += 1
+            if self._limit is not None and count >= self._limit:
+                return
 
     def flatten(self) -> Iterator[dict[str, str]]:
         aliases = [alias for _, alias in self.projections]
