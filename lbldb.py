@@ -1,5 +1,6 @@
 import csv
-from typing import Callable, Optional
+import re
+from typing import Callable, Optional, Sequence
 
 
 class Filter:
@@ -15,7 +16,7 @@ class Filter:
     def __or__(self, other: "Filter") -> "Filter":
         return Filter(lambda r: self(r) or other(r))
 
-    def __inv__(self) -> "Filter":
+    def __invert__(self) -> "Filter":
         return Filter(lambda r: not self(r))
 
 
@@ -41,6 +42,12 @@ class Column:
 
     def __ge__(self, other) -> Filter:
         return Filter(lambda r: type(other)(r[self.name]) >= other)
+
+    def isin(self, seq: Sequence[str]) -> Filter:
+        return Filter(lambda r: r[self.name] in seq)
+
+    def matches(self, regex: str) -> Filter:
+        return Filter(lambda r: re.match(regex, r[self.name]) is not None)
 
 
 class Database:
