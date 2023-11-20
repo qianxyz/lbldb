@@ -26,9 +26,13 @@ class Column:
         self.name = name
 
     def __eq__(self, other) -> Filter:
+        if isinstance(other, Column):
+            return Filter(lambda r: r[self.name] == r[other.name])
         return Filter(lambda r: type(other)(r[self.name]) == other)
 
     def __ne__(self, other) -> Filter:
+        if isinstance(other, Column):
+            return Filter(lambda r: r[self.name] != r[other.name])
         return Filter(lambda r: type(other)(r[self.name]) != other)
 
     def __lt__(self, other) -> Filter:
