@@ -2,6 +2,30 @@ import csv
 from typing import Callable, Optional
 
 
+class Column:
+    def __init__(self, dbid: int, name: str) -> None:
+        self.dbid = dbid
+        self.name = name
+
+    def __eq__(self, other) -> Callable[[dict], bool]:
+        return lambda r: type(other)(r[self.name]) == other
+
+    def __ne__(self, other) -> Callable[[dict], bool]:
+        return lambda r: type(other)(r[self.name]) != other
+
+    def __lt__(self, other) -> Callable[[dict], bool]:
+        return lambda r: type(other)(r[self.name]) < other
+
+    def __le__(self, other) -> Callable[[dict], bool]:
+        return lambda r: type(other)(r[self.name]) <= other
+
+    def __gt__(self, other) -> Callable[[dict], bool]:
+        return lambda r: type(other)(r[self.name]) > other
+
+    def __ge__(self, other) -> Callable[[dict], bool]:
+        return lambda r: type(other)(r[self.name]) >= other
+
+
 class Database:
     def __init__(self, path: str, fieldnames: Optional[list[str]] = None) -> None:
         if fieldnames is None:
@@ -22,6 +46,10 @@ class Database:
             writer.writeheader()
             self.fieldnames = fieldnames
 
+        # register `Column` objects
+        for name in self.fieldnames:
+            setattr(self, name, Column(id(self), name))
+
     def __iter__(self) -> csv.DictReader:
         self.stream.seek(0)
         return csv.DictReader(self.stream)
@@ -33,21 +61,25 @@ class Database:
 
 
 class Query:
-    def __init__(
-        self,
-        db: Database,
-        projections: Optional[list[str]] = None,
-        filters: Optional[list[Callable]] = None,
-    ) -> None:
+    def __init__(self, db: Database) -> None:
         self.db = db
-        self.projections = projections if projections is not None else []
-        self.filters = filters if filters is not None else []
+        self.projections: list[Column] = []
+        self.filters: list[Callable[[dict], bool]] = []
 
-    def add_projection(self, *args: str) -> None:
+    def project(self, *args: Column) -> "Query":
         self.projections.extend(args)
+        return self
 
-    def add_filter(self, *args: Callable) -> None:
+    def filter(self, *args: Callable[[dict], bool]) -> "Query":
         self.filters.extend(args)
+        return self
 
     def execute(self) -> None:
-        raise NotImplementedError("TODO")
+        for row in self.db:
+            # apply filtering
+            if not all(f(row) for f in self.filters):
+                continue
+            # apply projection (if any)
+            if len(self.projections) != 0:
+                row = {k.name: row[k.name] for k in self.projections}
+            print(row)
