@@ -2,28 +2,45 @@ import csv
 from typing import Callable, Optional
 
 
+class Filter:
+    def __init__(self, f: Callable[[dict], bool]) -> None:
+        self.f = f
+
+    def __call__(self, row: dict) -> bool:
+        return self.f(row)
+
+    def __and__(self, other: "Filter") -> "Filter":
+        return Filter(lambda r: self(r) and other(r))
+
+    def __or__(self, other: "Filter") -> "Filter":
+        return Filter(lambda r: self(r) or other(r))
+
+    def __inv__(self) -> "Filter":
+        return Filter(lambda r: not self(r))
+
+
 class Column:
     def __init__(self, dbid: int, name: str) -> None:
         self.dbid = dbid
         self.name = name
 
-    def __eq__(self, other) -> Callable[[dict], bool]:
-        return lambda r: type(other)(r[self.name]) == other
+    def __eq__(self, other) -> Filter:
+        return Filter(lambda r: type(other)(r[self.name]) == other)
 
-    def __ne__(self, other) -> Callable[[dict], bool]:
-        return lambda r: type(other)(r[self.name]) != other
+    def __ne__(self, other) -> Filter:
+        return Filter(lambda r: type(other)(r[self.name]) != other)
 
-    def __lt__(self, other) -> Callable[[dict], bool]:
-        return lambda r: type(other)(r[self.name]) < other
+    def __lt__(self, other) -> Filter:
+        return Filter(lambda r: type(other)(r[self.name]) < other)
 
-    def __le__(self, other) -> Callable[[dict], bool]:
-        return lambda r: type(other)(r[self.name]) <= other
+    def __le__(self, other) -> Filter:
+        return Filter(lambda r: type(other)(r[self.name]) <= other)
 
-    def __gt__(self, other) -> Callable[[dict], bool]:
-        return lambda r: type(other)(r[self.name]) > other
+    def __gt__(self, other) -> Filter:
+        return Filter(lambda r: type(other)(r[self.name]) > other)
 
-    def __ge__(self, other) -> Callable[[dict], bool]:
-        return lambda r: type(other)(r[self.name]) >= other
+    def __ge__(self, other) -> Filter:
+        return Filter(lambda r: type(other)(r[self.name]) >= other)
 
 
 class Database:
@@ -64,13 +81,13 @@ class Query:
     def __init__(self, db: Database) -> None:
         self.db = db
         self.projections: list[Column] = []
-        self.filters: list[Callable[[dict], bool]] = []
+        self.filters: list[Filter] = []
 
     def project(self, *args: Column) -> "Query":
         self.projections.extend(args)
         return self
 
-    def filter(self, *args: Callable[[dict], bool]) -> "Query":
+    def filter(self, *args: Filter) -> "Query":
         self.filters.extend(args)
         return self
 
