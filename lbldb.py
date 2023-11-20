@@ -132,7 +132,7 @@ class Query:
                 r[p.dbid][p.name] = row[p.dbid][p.name]
             yield dict(r)
 
-    def execute(self):
+    def flatten(self) -> Iterator[dict[str, str]]:
         aliases = [alias for _, alias in self.projections]
         # assert no duplicate column names
         if len(set(aliases)) != len(aliases):
@@ -142,4 +142,8 @@ class Query:
             result = {}
             for column, alias in self.projections:
                 result[alias] = column(row)
-            print(result)
+            yield result
+
+    def execute(self):
+        for row in self.flatten():
+            print(row)
