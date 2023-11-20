@@ -109,6 +109,7 @@ class Query:
         self.filters: list[Filter] = []
 
     def project(self, *args: Column) -> "Query":
+        # TODO: column aliasing
         self.projections.extend(args)
         return self
 
