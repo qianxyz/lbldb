@@ -33,7 +33,7 @@ Query(pokemons) \
 # (outer) join: initialize query with multiple dbs
 # to get anything useful, use filtering afterwards
 
-# find at which level does bulbasaur learn razor leaf in gen 1
+# find at which level does bulbasaur learn razor leaf in red/blue
 Query(pokemons, moves, learns) \
     .filter(
         (pokemons.id == learns.pokemon_id) &
@@ -44,4 +44,9 @@ Query(pokemons, moves, learns) \
     .filter(learns.version_group_id == "1") \
     .project(learns.level) \
     .execute()
+
+# groupby and aggregation: count numbers of moves for each generation
+Query(moves) \
+    .groupby(moves.generation_id) \
+    .count()
 ```

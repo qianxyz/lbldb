@@ -156,3 +156,24 @@ class Query:
     def execute(self):
         for row in self.flatten():
             print(row)
+
+    def groupby(self, *columns: Column) -> "Groupby":
+        return Groupby(self, *columns)
+
+
+class Groupby:
+    def __init__(self, query: Query, *columns: Column) -> None:
+        self.query = query
+        self.columns = columns
+
+    def count(self):
+        result = defaultdict(int)
+        for row in self.query:
+            key = tuple(c(row) for c in self.columns)
+            result[key] += 1
+        for key, count in result.items():
+            d = {}
+            for c, k in zip(self.columns, key):
+                d[c.name] = k
+            d["count"] = count
+            print(d)
