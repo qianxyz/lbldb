@@ -36,8 +36,8 @@ Query(pokemons) \
 # find at which level does bulbasaur learn razor leaf in gen 1
 Query(pokemons, moves, learns) \
     .filter(
-        pokemons.id == learns.pokemon_id &
-        moves.id == learns.move_id
+        (pokemons.id == learns.pokemon_id) &
+        (moves.id == learns.move_id)
     ) \
     .filter(pokemons.identifier == "bulbasaur") \
     .filter(moves.identifier == "razor-leaf") \
