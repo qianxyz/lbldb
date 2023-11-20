@@ -1,7 +1,7 @@
 import csv
 import re
 from collections import defaultdict
-from typing import Callable, Optional, Sequence
+from typing import Callable, Iterator, Optional, Sequence
 
 
 class Filter:
@@ -27,12 +27,7 @@ class Column:
         self.name = name
 
     def __call__(self, row: dict) -> str:
-        v = next(iter(row.values()))  # get an arbituary value from row
-        if isinstance(v, str):  # simple query
-            return row[self.name]
-        elif isinstance(v, dict):  # join query
-            return row[self.dbid][self.name]
-        raise TypeError(f"{row} is not a valid database row")
+        return row[self.dbid][self.name]
 
     def __eq__(self, other) -> Filter:
         if isinstance(other, Column):
@@ -98,58 +93,26 @@ class Database:
 
 
 class Query:
-    def __new__(cls, *db: Database):
-        if len(db) == 1:
-            return super().__new__(SimpleQuery)
-        else:
-            return super().__new__(JoinQuery)
-
-    def __init__(self) -> None:
-        self.projections: list[Column] = []
+    def __init__(self, *dbs: Database) -> None:
+        self.dbs = dbs
+        self.projections: list[tuple[Column, str]] = [
+            (getattr(db, fieldname), fieldname)
+            for db in dbs
+            for fieldname in db.fieldnames
+        ]
         self.filters: list[Filter] = []
 
-    def project(self, *args: Column) -> "Query":
-        # TODO: column aliasing
-        self.projections.extend(args)
+    def project(self, *args: Column, **kwargs: Column) -> "Query":
+        self.projections = [(arg, arg.name) for arg in args] + [
+            (arg, alias) for alias, arg in kwargs.items()
+        ]
         return self
 
     def filter(self, *args: Filter) -> "Query":
         self.filters.extend(args)
         return self
 
-    def __iter__(self):
-        raise NotImplementedError
-
-    def execute(self):
-        raise NotImplementedError
-
-
-class SimpleQuery(Query):
-    def __init__(self, db: Database) -> None:
-        super().__init__()
-        self.db = db
-
-    def __iter__(self):
-        for row in self.db:
-            # apply filtering
-            if not all(f(row) for f in self.filters):
-                continue
-            # apply projection (if any)
-            if self.projections:
-                row = {k.name: row[k.name] for k in self.projections}
-            yield row
-
-    def execute(self) -> None:
-        for row in self:
-            print(row)
-
-
-class JoinQuery(Query):
-    def __init__(self, *db: Database) -> None:
-        super().__init__()
-        self.db = db
-
-    def __iter__(self):
+    def __iter__(self) -> Iterator[dict[int, dict[str, str]]]:
         def product(iterables):
             if not iterables:
                 yield {}
@@ -159,18 +122,24 @@ class JoinQuery(Query):
                 for rest in product(tail):
                     yield {id(head): item, **rest}
 
-        for row in product(self.db):
+        for row in product(self.dbs):
             # apply filtering
             if not all(f(row) for f in self.filters):
                 continue
-            # apply projection (if any)
-            if self.projections:
-                r = defaultdict(dict)
-                for p in self.projections:
-                    r[p.dbid][p.name] = row[p.dbid][p.name]
-                row = dict(r)
-            yield row
+            # apply projection
+            r = defaultdict(dict)
+            for p, _ in self.projections:
+                r[p.dbid][p.name] = row[p.dbid][p.name]
+            yield dict(r)
 
-    def execute(self) -> None:
+    def execute(self):
+        aliases = [alias for _, alias in self.projections]
+        # assert no duplicate column names
+        if len(set(aliases)) != len(aliases):
+            raise ValueError(f"duplicate column name: {aliases}")
         for row in self:
-            print(row)
+            # flatten the nested dict
+            result = {}
+            for column, alias in self.projections:
+                result[alias] = column(row)
+            print(result)
