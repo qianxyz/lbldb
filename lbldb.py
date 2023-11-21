@@ -3,6 +3,7 @@ import heapq
 import itertools
 import json
 import re
+import sys
 import tempfile
 from collections import defaultdict
 from typing import Callable, Iterator, Optional, Sequence
@@ -160,8 +161,14 @@ class Query:
             yield result
 
     def execute(self):
+        aliases = [alias for _, alias in self.projections]
+        # assert no duplicate column names
+        if len(set(aliases)) != len(aliases):
+            raise ValueError(f"duplicate column name: {aliases}")
+        writer = csv.DictWriter(sys.stdout, fieldnames=aliases)
+        writer.writeheader()
         for row in self._flatten(iter(self)):
-            print(row)
+            writer.writerow(row)
 
     def groupby(self, *columns: Column) -> "Groupby":
         return Groupby(self, *columns)
@@ -174,8 +181,15 @@ class Query:
             reverse=reverse,
             debug=debug,
         )
+
+        aliases = [alias for _, alias in self.projections]
+        # assert no duplicate column names
+        if len(set(aliases)) != len(aliases):
+            raise ValueError(f"duplicate column name: {aliases}")
+        writer = csv.DictWriter(sys.stdout, fieldnames=aliases)
+        writer.writeheader()
         for row in self._flatten(sorted_it):
-            print(row)
+            writer.writerow(row)
 
 
 class Groupby:
@@ -188,12 +202,16 @@ class Groupby:
         for row in self.query:
             key = tuple(c(row) for c in self.columns)
             result[key] += 1
+        writer = csv.DictWriter(
+            sys.stdout, fieldnames=[c.name for c in self.columns] + ["count"]
+        )
+        writer.writeheader()
         for key, count in result.items():
             d = {}
             for c, k in zip(self.columns, key):
                 d[c.name] = k
             d["count"] = count
-            print(d)
+            writer.writerow(d)
 
 
 def external_sort(
