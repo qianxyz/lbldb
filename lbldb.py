@@ -3,6 +3,7 @@ import heapq
 import itertools
 import json
 import re
+import shutil
 import sys
 import tempfile
 from collections import defaultdict
@@ -95,6 +96,67 @@ class Database:
         self.stream.seek(0, 2)  # to the end
         writer = csv.DictWriter(self.stream, fieldnames=self.fieldnames)
         writer.writerow(record)
+
+
+class Update:
+    def __init__(self, db: Database) -> None:
+        self.db = db
+        self.filters: list[Filter] = []
+
+    def filter(self, *args: Filter) -> "Update":
+        self.filters.extend(args)
+        return self
+
+    def set(self, column: Column, value):
+        self.set_column = column
+        self.set_value = value
+        return self
+
+    def execute(self):
+        # write the updated version to a tempfile
+        tmpf = tempfile.TemporaryFile(mode="w+")
+        writer = csv.DictWriter(tmpf, fieldnames=self.db.fieldnames)
+        writer.writeheader()
+        for row in self.db:
+            if all(f({str(id(self.db)): row}) for f in self.filters):
+                row[self.set_column.name] = self.set_value
+            writer.writerow(row)
+
+        # copy the tempfile back
+        tmpf.seek(0)
+        self.db.stream.seek(0)
+        self.db.stream.truncate(0)
+        shutil.copyfileobj(tmpf, self.db.stream)
+
+        tmpf.close()
+
+
+class Delete:
+    def __init__(self, db: Database) -> None:
+        self.db = db
+        self.filters: list[Filter] = []
+
+    def filter(self, *args: Filter) -> "Delete":
+        self.filters.extend(args)
+        return self
+
+    def execute(self):
+        # write the updated version to a tempfile
+        tmpf = tempfile.TemporaryFile(mode="w+")
+        writer = csv.DictWriter(tmpf, fieldnames=self.db.fieldnames)
+        writer.writeheader()
+        for row in self.db:
+            if all(f({str(id(self.db)): row}) for f in self.filters):
+                continue
+            writer.writerow(row)
+
+        # copy the tempfile back
+        tmpf.seek(0)
+        self.db.stream.seek(0)
+        self.db.stream.truncate(0)
+        shutil.copyfileobj(tmpf, self.db.stream)
+
+        tmpf.close()
 
 
 class Query:
