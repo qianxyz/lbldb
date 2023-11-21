@@ -4,10 +4,10 @@
 
 ```python
 # create new table
-students = Database("./csv/students.csv", fieldnames=["name", "age"])
+students = Database("./students.csv", fieldnames=["name", "age"])
 
 # load existing table (fieldnames are inferred)
-pokemons = Database("./csv/pokemon.csv")
+pokemons = Database("./example/pokemon.csv")
 
 # add a row to a table
 students.append({"name": "John", "age": 23})
