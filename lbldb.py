@@ -1,5 +1,9 @@
 import csv
+import heapq
+import itertools
+import json
 import re
+import tempfile
 from collections import defaultdict
 from typing import Callable, Iterator, Optional, Sequence
 
@@ -22,7 +26,7 @@ class Filter:
 
 
 class Column:
-    def __init__(self, dbid: int, name: str) -> None:
+    def __init__(self, dbid: str, name: str) -> None:
         self.dbid = dbid
         self.name = name
 
@@ -80,7 +84,7 @@ class Database:
 
         # register `Column` objects
         for name in self.fieldnames:
-            setattr(self, name, Column(id(self), name))
+            setattr(self, name, Column(str(id(self)), name))
 
     def __iter__(self) -> csv.DictReader:
         self.stream.seek(0)
@@ -117,7 +121,7 @@ class Query:
         self._limit = n
         return self
 
-    def __iter__(self) -> Iterator[dict[int, dict[str, str]]]:
+    def __iter__(self) -> Iterator[dict[str, dict[str, str]]]:
         def product(iterables):
             if not iterables:
                 yield {}
@@ -125,7 +129,7 @@ class Query:
             head, *tail = iterables
             for item in head:
                 for rest in product(tail):
-                    yield {id(head): item, **rest}
+                    yield {str(id(head)): item, **rest}
 
         count = 0
         for row in product(self.dbs):
@@ -141,12 +145,14 @@ class Query:
             if self._limit is not None and count >= self._limit:
                 return
 
-    def flatten(self) -> Iterator[dict[str, str]]:
+    def _flatten(
+        self, it: Iterator[dict[str, dict[str, str]]]
+    ) -> Iterator[dict[str, str]]:
         aliases = [alias for _, alias in self.projections]
         # assert no duplicate column names
         if len(set(aliases)) != len(aliases):
             raise ValueError(f"duplicate column name: {aliases}")
-        for row in self:
+        for row in it:
             # flatten the nested dict
             result = {}
             for column, alias in self.projections:
@@ -154,11 +160,17 @@ class Query:
             yield result
 
     def execute(self):
-        for row in self.flatten():
+        for row in self._flatten(iter(self)):
             print(row)
 
     def groupby(self, *columns: Column) -> "Groupby":
         return Groupby(self, *columns)
+
+    def sort(self, column: Column):
+        it = iter(self)
+        sorted_it = external_sort(it, key=column)
+        for row in self._flatten(sorted_it):
+            print(row)
 
 
 class Groupby:
@@ -177,3 +189,48 @@ class Groupby:
                 d[c.name] = k
             d["count"] = count
             print(d)
+
+
+def external_sort(
+    it: Iterator, key: Callable, reverse=False, chunk_size=16
+) -> Iterator:
+    tmpfs = []
+
+    # sort the chunks
+    while True:
+        chunk = list(itertools.islice(it, chunk_size))
+        if not chunk:
+            break
+        chunk.sort(key=key, reverse=reverse)
+        tmpf = tempfile.NamedTemporaryFile(mode="w+", delete=False)
+        # tmpf = tempfile.TemporaryFile(mode="w+")
+        for item in chunk:
+            tmpf.write(json.dumps(item) + "\n")
+        tmpf.seek(0)
+        tmpfs.append(tmpf)
+        if len(chunk) < chunk_size:
+            break
+
+    # merge until number of runs < chunk size
+    while len(tmpfs) > chunk_size:
+        new_tmpfs = []
+
+        for i in range(0, len(tmpfs), chunk_size):
+            chunk = tmpfs[i:i + chunk_size]
+            sorted_its = [map(json.loads, f) for f in chunk]
+            tmpf = tempfile.NamedTemporaryFile(mode="w+", delete=False)
+            # tmpf = tempfile.TemporaryFile(mode="w+")
+            for item in heapq.merge(*sorted_its, key=key, reverse=reverse):
+                tmpf.write(json.dumps(item) + "\n")
+            tmpf.seek(0)
+            new_tmpfs.append(tmpf)
+
+        tmpfs = new_tmpfs
+
+    # yield
+    sorted_its = [map(json.loads, f) for f in tmpfs]
+    for item in heapq.merge(*sorted_its, key=key, reverse=reverse):
+        yield item
+
+    for f in tmpfs:
+        f.close()

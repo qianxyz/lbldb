@@ -49,4 +49,8 @@ Query(pokemons, moves, learns) \
 Query(moves) \
     .groupby(moves.generation_id) \
     .count()
+
+# sorting: sort all pokemons by their identifier (dictionary order)
+Query(pokemons) \
+    .sort(pokemons.identifier)
 ```
