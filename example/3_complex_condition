@@ -1,0 +1,7 @@
+pokemons = Database("./example/pokemons.csv")
+
+Query(pokemons) \
+    .filter((pokemons.height > 80) | (pokemons.weight > 8000)) \
+    .filter(~pokemons.identifier.matches(r".*-.*")) \
+    .project(pokemons.identifier, pokemons.height, pokemons.weight) \
+    .execute()

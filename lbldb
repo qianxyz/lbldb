@@ -20,8 +20,12 @@ atexit.register(readline.write_history_file, histfile)
 
 import sys
 
-sys.ps1 = "lbldb> "
-sys.ps2 = "       "
+if sys.__stdin__.isatty():
+    sys.ps1 = "lbldb> "
+    sys.ps2 = "       "
+else:
+    sys.ps1 = ""
+    sys.ps2 = ""
 
 from lbldb import *
 EOF

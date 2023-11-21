@@ -1,0 +1,7 @@
+students = Database("./students.csv", fieldnames=["name", "age"])
+
+students.append({"name": "John", "age": 23})
+students.append({"name": "Jack", "age": 21})
+students.append({"name": "Mary", "age": 22})
+
+Query(students).execute()
