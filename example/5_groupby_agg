@@ -1,0 +1,5 @@
+moves = Database("./example/moves.csv")
+
+Query(moves) \
+    .groupby(moves.generation_id) \
+    .count()

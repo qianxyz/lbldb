@@ -1,0 +1,7 @@
+pokemons = Database("./example/pokemons.csv")
+
+Query(pokemons) \
+    .project(pokemons.identifier, pokemons.height) \
+    .sort(pokemons.height, key=int, reverse=True) \
+    .limit(10) \
+    .execute()
