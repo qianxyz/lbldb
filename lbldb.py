@@ -166,9 +166,14 @@ class Query:
     def groupby(self, *columns: Column) -> "Groupby":
         return Groupby(self, *columns)
 
-    def sort(self, column: Column):
+    def sort(self, column: Column, key=None, reverse=False, debug=False):
         it = iter(self)
-        sorted_it = external_sort(it, key=column)
+        sorted_it = external_sort(
+            it,
+            key=column if key is None else lambda r: key(column(r)),
+            reverse=reverse,
+            debug=debug,
+        )
         for row in self._flatten(sorted_it):
             print(row)
 
@@ -192,7 +197,7 @@ class Groupby:
 
 
 def external_sort(
-    it: Iterator, key: Callable, reverse=False, chunk_size=16
+    it: Iterator, key: Callable, reverse=False, debug=False, chunk_size=16
 ) -> Iterator:
     tmpfs = []
 
@@ -202,8 +207,10 @@ def external_sort(
         if not chunk:
             break
         chunk.sort(key=key, reverse=reverse)
-        tmpf = tempfile.NamedTemporaryFile(mode="w+", delete=False)
-        # tmpf = tempfile.TemporaryFile(mode="w+")
+        if debug:
+            tmpf = tempfile.NamedTemporaryFile(mode="w+", delete=False)
+        else:
+            tmpf = tempfile.TemporaryFile(mode="w+")
         for item in chunk:
             tmpf.write(json.dumps(item) + "\n")
         tmpf.seek(0)
@@ -216,10 +223,12 @@ def external_sort(
         new_tmpfs = []
 
         for i in range(0, len(tmpfs), chunk_size):
-            chunk = tmpfs[i:i + chunk_size]
+            chunk = tmpfs[i : i + chunk_size]
             sorted_its = [map(json.loads, f) for f in chunk]
-            tmpf = tempfile.NamedTemporaryFile(mode="w+", delete=False)
-            # tmpf = tempfile.TemporaryFile(mode="w+")
+            if debug:
+                tmpf = tempfile.NamedTemporaryFile(mode="w+", delete=False)
+            else:
+                tmpf = tempfile.TemporaryFile(mode="w+")
             for item in heapq.merge(*sorted_its, key=key, reverse=reverse):
                 tmpf.write(json.dumps(item) + "\n")
             tmpf.seek(0)
