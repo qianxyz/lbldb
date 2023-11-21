@@ -52,5 +52,6 @@ Query(moves) \
 
 # sorting: sort all pokemons by their identifier (dictionary order)
 Query(pokemons) \
-    .sort(pokemons.identifier)
+    .sort(pokemons.identifier) \
+    .execute()
 ```

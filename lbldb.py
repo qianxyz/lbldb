@@ -174,22 +174,7 @@ class Query:
         return Groupby(self, *columns)
 
     def sort(self, column: Column, key=None, reverse=False, debug=False):
-        it = iter(self)
-        sorted_it = external_sort(
-            it,
-            key=column if key is None else lambda r: key(column(r)),
-            reverse=reverse,
-            debug=debug,
-        )
-
-        aliases = [alias for _, alias in self.projections]
-        # assert no duplicate column names
-        if len(set(aliases)) != len(aliases):
-            raise ValueError(f"duplicate column name: {aliases}")
-        writer = csv.DictWriter(sys.stdout, fieldnames=aliases)
-        writer.writeheader()
-        for row in self._flatten(sorted_it):
-            writer.writerow(row)
+        return Sort(self, column, key, reverse, debug)
 
 
 class Groupby:
@@ -212,6 +197,41 @@ class Groupby:
                 d[c.name] = k
             d["count"] = count
             writer.writerow(d)
+
+
+class Sort:
+    def __init__(self, query, column, key, reverse, debug) -> None:
+        self.query = query
+        self.column = column
+        self.key = key
+        self.reverse = reverse
+        self.debug = debug
+        self._limit = None
+
+    def limit(self, n: int):
+        self._limit = n
+        return self
+
+    def execute(self):
+        it = iter(self.query)
+        sorted_it = external_sort(
+            it,
+            key=self.column if self.key is None else lambda r: self.key(self.column(r)),
+            reverse=self.reverse,
+            debug=self.debug,
+        )
+
+        aliases = [alias for _, alias in self.query.projections]
+        # assert no duplicate column names
+        if len(set(aliases)) != len(aliases):
+            raise ValueError(f"duplicate column name: {aliases}")
+        writer = csv.DictWriter(sys.stdout, fieldnames=aliases)
+        writer.writeheader()
+        it = self.query._flatten(sorted_it)
+        if self._limit is not None:
+            it = itertools.islice(it, self._limit)
+        for row in it:
+            writer.writerow(row)
 
 
 def external_sort(
