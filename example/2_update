@@ -1,0 +1,8 @@
+students = Database("./students.csv")
+
+Update(students) \
+    .filter(students.name == "John") \
+    .set(students.age, 25) \
+    .execute()
+
+Query(students).execute()

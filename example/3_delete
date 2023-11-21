@@ -1,0 +1,7 @@
+students = Database("./students.csv")
+
+Delete(students) \
+    .filter(students.age <= 22) \
+    .execute()
+
+Query(students).execute()
