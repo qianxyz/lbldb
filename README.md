@@ -1,6 +1,23 @@
 # Line-by-line Database
 
-## Create
+## Usage
+
+The implementation is contained in the single `lbldb.py` file. 
+
+The script `lbldb` provides the CLI entrance:
+
+```bash
+$ ./lbldb  # drop into REPL
+$ ./lbldb < example/1_create  # or other examples in the directory
+```
+
+## Language Specification
+
+NOTE: The following snippets are intended to showcase the language. To actually
+run them, make sure all the tables are loaded beforehand. For some examples
+that can be run directly, see the examples directory.
+
+### Create
 
 ```python
 # create new table
@@ -13,7 +30,7 @@ pokemons = Database("./example/pokemon.csv")
 students.append({"name": "John", "age": 23})
 ```
 
-## Read
+### Read
 
 ```python
 # list all pokemons
@@ -53,5 +70,22 @@ Query(moves) \
 # sorting: sort all pokemons by their identifier (dictionary order)
 Query(pokemons) \
     .sort(pokemons.identifier) \
+    .execute()
+```
+
+### Update
+```python
+# set the age of John to 25
+Update(students) \
+    .filter(students.name == "John") \
+    .set(students.age, 25) \
+    .execute()
+```
+
+### Delete
+```python
+# delete all students under 22
+Delete(students) \
+    .filter(students.age <= 22) \
     .execute()
 ```
